@@ -137,7 +137,6 @@ const customerOptions = useMemo(() => {
     placeholderData: (previousData) => previousData,
   });
 
-  // The chosen product may not be in the current search results (e.g. a saved loan).
   const { data: selectedProductResponse } = useQuery({
     queryKey: ["loanProducts", "selected", form.values.productCode],
     queryFn: () => getLoanProductById(form.values.productCode as string),
@@ -166,6 +165,11 @@ const customerOptions = useMemo(() => {
       label: p.name,
     }));
   }, [productList, form.values.productCode]);
+
+  const selectedProduct = selectedProductResponse?.message?.data;
+    const maxLoanAmount = selectedProduct?.maximum_loan_amount;
+  const loanAmountTooHigh =
+  form.values.loanAmount > maxLoanAmount;
 
   useEffect(() => {
     if (!form.values.valueDate) {
@@ -298,23 +302,6 @@ const customerOptions = useMemo(() => {
               value={toDateObj(form.values.trnDate)}
               onChange={(date) => form.setFieldValue("trnDate", toDateString(date))}
             />
-            {/* <DateInput
-              label="Value Date"
-              withAsterisk
-              valueFormat="DD-MMM-YYYY"
-              placeholder="DD-MMM-YYYY"
-              value={toDateObj(form.values.valueDate)}
-              onChange={(date) => form.setFieldValue("valueDate", toDateString(date))}
-            /> */}
-            {/* <DateInput
-              label="Value Date"
-              withAsterisk
-              valueFormat="DD-MMM-YYYY"
-              placeholder="DD-MMM-YYYY"
-              value={toDateObj(form.values.valueDate)}
-              onChange={(date) => form.setFieldValue("valueDate", toDateString(date))}
-              error={form.errors.valueDate}
-            /> */}
             <DateInput
               label="Value Date"
               withAsterisk
@@ -336,6 +323,7 @@ const customerOptions = useMemo(() => {
               placeholder="0"
               thousandSeparator=","
               {...form.getInputProps("loanAmount")}
+              error={loanAmountTooHigh ? `Loan Amount should not exceed ${currencySymbol}${maxLoanAmount}` : undefined}
               required
             />
           </SimpleGrid>
@@ -367,7 +355,7 @@ const customerOptions = useMemo(() => {
               required
             />
             <NumberInput
-  label="Repayment Amount"
+  label="Installment Amount"
   placeholder="0"
   hideControls
   min={0}
@@ -465,7 +453,7 @@ const customerOptions = useMemo(() => {
       autosize
       leftSection={<IconNotes size={14} style={{ color: "var(--mantine-color-slate-4)" }} />}
       leftSectionProps={{ style: { alignItems: 'flex-start', paddingTop: '10px' } }}
-      style={{ gridColumn: 'span 2' }}
+      style={{ gridColumn: 'span 2', alignSelf: 'start' }}
       {...form.getInputProps("_comments")}
     />
   </SimpleGrid>

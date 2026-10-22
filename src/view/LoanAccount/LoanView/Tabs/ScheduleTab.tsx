@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Paper, Table, Text, Badge, Loader, Group } from "@mantine/core";
 import { IconChevronUp, IconChevronDown, IconSelector } from "@tabler/icons-react";
 import { themeTokens, serif } from "../SharedUI";
+import { formatDisplayDate } from "../../../../utils/formatDate";
 
 type SortField =
   | "idx"
@@ -96,7 +97,11 @@ export function ScheduleTab({ data, renderCurrency }: any) {
         >
           <div>
             <Text fz="lg" fw={600} c="slate.9" style={serif}>Repayment Schedule</Text>
-            <Text fz="xs" c="dimmed">Reference: {schedule.name}</Text>
+            <Text fz="xs" c="dimmed">
+              {schedule.is_projected
+                ? "Projected schedule (no repayment schedule generated yet)"
+                : `Reference: ${schedule.name}`}
+            </Text>
           </div>
 
           <Badge size="sm" variant="light" color="blue">
@@ -141,7 +146,7 @@ export function ScheduleTab({ data, renderCurrency }: any) {
               {sortedRows.map((row: any) => (
                 <Table.Tr key={row.idx}>
                   <Table.Td className="font-mono text-slate-500">{row.idx}</Table.Td>
-                  <Table.Td>{row.payment_date}</Table.Td>
+                  <Table.Td>{formatDisplayDate(row.payment_date)}</Table.Td>
                   <Table.Td className="font-mono">{renderCurrency(row.principal_amount)}</Table.Td>
                   <Table.Td className="font-mono">{renderCurrency(row.interest_amount)}</Table.Td>
                   <Table.Td className="font-mono font-semibold text-slate-800">

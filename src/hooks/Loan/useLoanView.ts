@@ -11,6 +11,8 @@ import {
   getDisbursementHistory,
   getRepaymentSchedule
 } from "../../api/Loan/loanViewApi";
+import { getLoanById } from "../../api/loanApi";
+import { getRepaymentSchedule as getProjectedRepaymentSchedule } from "../../api/loanRestructureApi";
 import type {
   LoanOverview,
   TimelineStatusRow,
@@ -32,6 +34,8 @@ export function useLoanView(loanId: string) {
   const [timeline, setTimeline] = useState<TimelineStatusRow[]>([]);
   const [activeInstallment, setActiveInstallment] = useState<InstallmentDetail | null>(null);
   const [schedule, setSchedule] = useState<any | null>(null);
+  /** get_loan_by_id data (posting_date, loan_charges, ...). */
+  const [loanDetails, setLoanDetails] = useState<any | null>(null);
 
   const [history, setHistory] = useState<RepaymentHistoryRow[]>([]);
   const [disbursements, setDisbursements] = useState<DisbursementRow[]>([]);
@@ -71,6 +75,7 @@ export function useLoanView(loanId: string) {
     documents: false,
     activity: false,
     schedule: false,
+    loanDetails: false,
   });
 
   // Fetchers
@@ -85,6 +90,19 @@ export function useLoanView(loanId: string) {
       console.error("Failed to fetch overview", error);
     } finally {
       setLoading((prev) => ({ ...prev, overview: false }));
+    }
+  }, [loanId]);
+
+  const fetchLoanDetails = useCallback(async () => {
+    if (!loanId) return;
+    setLoading((prev) => ({ ...prev, loanDetails: true }));
+    try {
+      const res = await getLoanById(loanId);
+      setLoanDetails(res?.message?.data ?? null);
+    } catch (error) {
+      console.error("Failed to fetch loan details", error);
+    } finally {
+      setLoading((prev) => ({ ...prev, loanDetails: false }));
     }
   }, [loanId]);
 
@@ -121,7 +139,46 @@ export function useLoanView(loanId: string) {
     setLoading((prev) => ({ ...prev, schedule: true }));
     try {
       const res = await getRepaymentSchedule({ id: loanId });
-      setSchedule(res.data);
+      let result = res.data;
+
+      // No schedule yet (e.g. not disbursed): show the projected one from
+      // lending.api.get_repayment_schedule, built from the loan's own values.
+      if (!result?.repayment_schedule?.length) {
+        try {
+          const loan = (await getLoanById(loanId))?.message?.data;
+          if (
+            loan?.loan_product &&
+            Number(loan.loan_amount) > 0 &&
+            Number(loan.repayment_periods) > 0 &&
+            loan.repayment_frequency &&
+            loan.repayment_start_date
+          ) {
+            const projected = await getProjectedRepaymentSchedule({
+              loan_product: loan.loan_product,
+              loan_amount: Number(loan.loan_amount),
+              rate_of_interest: Number(loan.rate_of_interest) || 0,
+              tenure: Number(loan.repayment_periods),
+              repayment_frequency: loan.repayment_frequency,
+              repayment_start_date: loan.repayment_start_date,
+            });
+            if (projected?.repayment_periods?.length) {
+              result = {
+                is_projected: true,
+                rate_of_interest: projected.rate_of_interest,
+                repayment_schedule: projected.repayment_periods.map((row, i) => ({
+                  ...row,
+                  idx: i + 1,
+                })),
+              };
+            }
+          }
+        } catch (error) {
+          // Keep the (empty) schedule from the current API.
+          console.error("Failed to fetch projected schedule", error);
+        }
+      }
+
+      setSchedule(result);
     } catch (error) {
       console.error("Failed to fetch schedule", error);
     } finally {
@@ -239,6 +296,7 @@ export function useLoanView(loanId: string) {
     setTimeline([]);
     setActiveInstallment(null);
     setSchedule(null);
+    setLoanDetails(null);
     setHistory([]);
     setDisbursements([]);
     setAccounting([]);
@@ -269,6 +327,19 @@ export function useLoanView(loanId: string) {
   useEffect(() => {
     fetchOverview();
   }, [fetchOverview]);
+
+  // Value Date (header) and Charges tab
+  useEffect(() => {
+    fetchLoanDetails();
+  }, [fetchLoanDetails]);
+
+  // No maturity date: the header shows the schedule's last payment date instead,
+  // so the schedule is needed without waiting for the Schedule tab.
+  useEffect(() => {
+    if (overview && !overview.maturity_date && !schedule && !loading.schedule) {
+      fetchSchedule();
+    }
+  }, [overview, schedule, loading.schedule, fetchSchedule]);
 
   // Lazy load tabs based on active view
   useEffect(() => {
@@ -304,6 +375,7 @@ export function useLoanView(loanId: string) {
       timeline,
       activeInstallment,
       schedule,
+      loanDetails,
       history,
       disbursements,
       accounting,
@@ -326,6 +398,7 @@ export function useLoanView(loanId: string) {
       fetchTimeline,
       fetchInstallment,
       fetchSchedule,
+      fetchLoanDetails,
       fetchHistory,
       fetchDisbursements,
       fetchAccounting,
