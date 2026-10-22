@@ -373,6 +373,12 @@ export function LoanAccountModal({
   });
 
   const handleSubmit = (values: typeof form.values) => {
+    // Same rule as the "Loan Amount should not exceed" message in BasicDetailsTab.
+    const maxLoanAmount = loanProductDetails?.message?.data?.maximum_loan_amount;
+    if (values.loanAmount > maxLoanAmount) {
+      setActiveTab("basic");
+      return;
+    }
      if (values.fixedRepaymentsIn === "EMI" && scheduleError) {
     form.setFieldError("repaymentAmount", scheduleError);
     setActiveTab("basic");

@@ -1,6 +1,7 @@
 import { Paper, Table, Text, Group, Pagination } from "@mantine/core";
 import { IconWallet } from "@tabler/icons-react";
 import { serif } from "../SharedUI";
+import { formatDisplayDate } from "../../../../utils/formatDate";
 
 export function AccountingTab({ data, meta, page, setPage, onPaginate, renderCurrency }: any) {
   return (
@@ -24,7 +25,7 @@ export function AccountingTab({ data, meta, page, setPage, onPaginate, renderCur
             <Table.Tbody>
               {data.map((row: any, i: number) => (
                 <Table.Tr key={`${row.description}-${i}`}>
-                  <Table.Td>{row.posting_date}</Table.Td>
+                  <Table.Td>{formatDisplayDate(row.posting_date)}</Table.Td>
                   <Table.Td>
                     <Text fz="sm" fw={500}>{row.description}</Text>
                     <Text fz="xs" c="dimmed">{row.voucher_type}</Text>
