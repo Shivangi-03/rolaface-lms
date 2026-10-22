@@ -25,7 +25,8 @@ import { useQuery } from "@tanstack/react-query";
 import { getAllCustomers } from "../../../api/customerApi";
 import { useEffect, useMemo, useState } from "react";
 import { useDebouncedValue } from "@mantine/hooks";
-import { getAllLoanProducts } from "../../../api/productApi";
+import { getLoanProductById } from "../../../api/productApi";
+import { getLoanProducts } from "../../../api/LoanProduct/LoanProductAPi";
 import { getSymbol } from "../../../store/currencyStore";
 import { useCompanyStore } from "../../../store/companyStore";
 
@@ -121,20 +122,34 @@ const customerOptions = useMemo(() => {
     ? customerLabelMap[form.values.customerNumber] || ""
     : "";
 
- const { data: productResponse, isLoading: isProductsLoading, refetch: refetchProducts } = useQuery({
-    queryKey: ["loanProducts"],
-    queryFn: () => getAllLoanProducts({ page_size: 1000 }),
+  const [productSearchInput, setProductSearchInput] = useState("");
+  const [debouncedProductSearch] = useDebouncedValue(productSearchInput, 400);
+
+  // Same search as the Loan Product table (get_loan_products?search=..&page=1&page_size=10).
+  const { data: productResponse, isLoading: isProductsLoading, refetch: refetchProducts } = useQuery({
+    queryKey: ["loanProducts", "search", debouncedProductSearch],
+    queryFn: () =>
+      getLoanProducts({
+        search: debouncedProductSearch.trim() || undefined,
+        page: 1,
+        page_size: 10,
+      }),
+    placeholderData: (previousData) => previousData,
+  });
+
+  // The chosen product may not be in the current search results (e.g. a saved loan).
+  const { data: selectedProductResponse } = useQuery({
+    queryKey: ["loanProducts", "selected", form.values.productCode],
+    queryFn: () => getLoanProductById(form.values.productCode as string),
+    enabled: !!form.values.productCode,
   });
 
   const productList = useMemo(() => {
-    return Array.isArray(productResponse?.data)
-      ? productResponse.data
-      : Array.isArray(productResponse?.message?.data)
-      ? productResponse.message.data
-      : Array.isArray(productResponse)
-      ? productResponse
-      : [];
-  }, [productResponse]);
+    const list: any[] = [...(productResponse?.data ?? [])];
+    const selected = selectedProductResponse?.message?.data;
+    if (selected && !list.some((p) => p.name === selected.name)) list.push(selected);
+    return list;
+  }, [productResponse, selectedProductResponse]);
 
   const productOptions = useMemo(() => {
     const activeProducts = productList.filter((p: any) => p.disabled !== 1);
@@ -198,16 +213,10 @@ const customerOptions = useMemo(() => {
             error={form.errors.productCode}
             onClick={() => refetchProducts()}
             required
-            filter={({ options, search }) => {
-              const q = search.toLowerCase().trim();
-              if (!q) return options;
-              return options.filter((opt) => {
-                const p = productList.find((item: any) => item.name === opt.value);
-                const codeMatch = opt.label.toLowerCase().includes(q);
-                const nameMatch = (p?.product_name || "").toLowerCase().includes(q);
-                return codeMatch || nameMatch;
-              });
-            }}
+            searchValue={productSearchInput}
+            onSearchChange={setProductSearchInput}
+            // The API already filtered by the search.
+            filter={({ options }) => options}
             renderOption={({ option }) => {
               const p = productList.find((item: any) => item.name === option.value);
               return (
