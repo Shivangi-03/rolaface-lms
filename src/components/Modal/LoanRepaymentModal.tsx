@@ -92,6 +92,10 @@ export function LoanRepaymentModal({
     queryKey: ["loanRepaymentAccounts", search],
     queryFn: () => getLoanRepaymentAccount(search),
     enabled: opened && search.trim().length > 0,
+    // Loan statuses change (e.g. Settled / Closed after a full payment), so never
+    // reuse an earlier search result: always call the API and keep nothing cached.
+    staleTime: 0,
+    gcTime: 0,
   });
   const { data: modeOfPaymentResponse, isLoading: isModeOfPaymentLoading } =
     useQuery({
@@ -193,6 +197,8 @@ export function LoanRepaymentModal({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["loanRepayments"] });
       queryClient.invalidateQueries({ queryKey: ["loanRepayment", editId] });
+      // A repayment can change the loan's status, so the account search must be re-run.
+      queryClient.invalidateQueries({ queryKey: ["loanRepaymentAccounts"] });
       queryClient.refetchQueries({ queryKey: ["loanRepayments"] });
       showSuccess("Repayment Updated", "Loan repayment updated successfully.");
       handleReset();
@@ -315,6 +321,8 @@ export function LoanRepaymentModal({
     mutationFn: createLoanRepayment,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["loanRepayments"] });
+      // A full payment settles / closes the loan, so the account search must be re-run.
+      queryClient.invalidateQueries({ queryKey: ["loanRepaymentAccounts"] });
       queryClient.refetchQueries({ queryKey: ["loanRepayments"] });
       showSuccess(
         "Repayment Processed",

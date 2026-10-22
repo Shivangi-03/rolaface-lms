@@ -477,9 +477,9 @@ export function LoanAccount() {
                   <ActionIcon
                     size="sm"
                     variant="subtle"
-                    color={isDraft ? "danger" : "slate"}
+                    color={(isDraft || isCancelled) ? "danger" : "slate"}
                     radius="md"
-                    disabled={!isDraft || isDeleting}
+                    disabled={!(isDraft || isCancelled) || isDeleting}
                     onClick={() => confirmDelete(loanIdentifier)}
                   >
                     <IconTrash size={14} />
