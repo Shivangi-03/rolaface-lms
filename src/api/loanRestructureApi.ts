@@ -314,6 +314,8 @@ export interface RepaymentScheduleResponse {
   tenure: number;
   repayment_start_date: string;
   repayment_periods: RepaymentSchedulePeriod[];
+  total_interest: number;
+  total_repayment: number;
 }
 
 

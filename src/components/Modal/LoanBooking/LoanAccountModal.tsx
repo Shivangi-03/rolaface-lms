@@ -174,20 +174,6 @@ export function LoanAccountModal({
       calcEmi(Number(form.values.loanAmount) || 0, effectiveRate, tenureMonths),
     [form.values.loanAmount, tenureMonths, effectiveRate],
   );
-
-  const totalRepayment = useMemo(
-    () => Math.round(estimatedEmi * tenureMonths * 100) / 100,
-    [estimatedEmi, tenureMonths],
-  );
-
-  const totalInterest = useMemo(
-    () =>
-      Math.round(
-        (totalRepayment - (Number(form.values.loanAmount) || 0)) * 100,
-      ) / 100,
-    [totalRepayment, form.values.loanAmount],
-  );
-
   const summaryPrincipal = Number(form.values.loanAmount) || 0;
 
   const handleAddDocument = () =>
@@ -387,6 +373,12 @@ export function LoanAccountModal({
   });
 
   const handleSubmit = (values: typeof form.values) => {
+    // Same rule as the "Loan Amount should not exceed" message in BasicDetailsTab.
+    const maxLoanAmount = loanProductDetails?.message?.data?.maximum_loan_amount;
+    if (values.loanAmount > maxLoanAmount) {
+      setActiveTab("basic");
+      return;
+    }
      if (values.fixedRepaymentsIn === "EMI" && scheduleError) {
     form.setFieldError("repaymentAmount", scheduleError);
     setActiveTab("basic");
@@ -400,6 +392,7 @@ export function LoanAccountModal({
       auto_create_disbursement_on_loan_booking:
         values.auto_create_disbursement_on_loan_booking,
       is_term_loan: 1,
+      repayment_frequency: values.frequency,
       posting_date: values.valueDate,
       repayment_method:
         values.fixedRepaymentsIn === "TENOR"
@@ -565,8 +558,23 @@ const scheduleMissingFields = useMemo(() => {
     useState<RepaymentScheduleResponse | null>(null);
   const [isFetchingSchedule, setIsFetchingSchedule] = useState(false);
   const [scheduleError, setScheduleError] = useState<string | null>(null);
-const previousScheduleErrorRef = useRef<string | null>(null);
- useEffect(() => {
+  const scheduleTotals = useMemo(() => {
+  const rows = schedulePreview?.repayment_periods ?? [];
+  const totalInterest = rows.reduce(
+    (sum, r) => sum + Number(r.interest_amount || 0),
+    0,
+  );
+  const totalRepayment = rows.reduce(
+    (sum, r) => sum + Number(r.total_payment || 0),
+    0,
+  );
+  return {
+    totalInterest: Math.round(totalInterest * 100) / 100,
+    totalRepayment: Math.round(totalRepayment * 100) / 100,
+  };
+}, [schedulePreview]);
+
+  useEffect(() => {
   if (!opened) return;
 
   if (scheduleMissingFields.length > 0) {
@@ -658,6 +666,7 @@ const previousScheduleErrorRef = useRef<string | null>(null);
         trnDate: loan.transaction_date || getTodayDate(),
         refNumber: loan.reference_number || "",
         migrationDate: loan.migration_date || "",
+        frequency: loan.repayment_frequency || "Monthly",
         fixedRepaymentsIn:
           loan.repayment_method === "Repay Over Number of Periods"
             ? "TENOR"
@@ -1099,8 +1108,7 @@ const previousScheduleErrorRef = useRef<string | null>(null);
 
             <LoanSummarySidebar
               productCode={form.values.productCode}
-              rateOfInterest={effectiveRate}
-              summaryPrincipal={summaryPrincipal}
+               summaryPrincipal={summaryPrincipal}
               currency={form.values.currency}
               tenureMonths={tenureMonths}
               frequency={form.values.frequency}
@@ -1108,9 +1116,10 @@ const previousScheduleErrorRef = useRef<string | null>(null);
               maturityDate={finalMaturityDate}
               moratoriumType={form.values.moratoriumType}
               estimatedEmi={estimatedEmi}
-              totalInterest={totalInterest}
-              totalRepayment={totalRepayment}
-            />
+              rateOfInterest={schedulePreview?.rate_of_interest || effectiveRate || 0}
+totalInterest={scheduleTotals.totalInterest}
+totalRepayment={scheduleTotals.totalRepayment}
+              />
           </div>
 
           {/* Footer — shared ModalFooter, no Reset action exposed. */}

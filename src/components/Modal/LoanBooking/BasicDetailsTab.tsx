@@ -25,7 +25,8 @@ import { useQuery } from "@tanstack/react-query";
 import { getAllCustomers } from "../../../api/customerApi";
 import { useEffect, useMemo, useState } from "react";
 import { useDebouncedValue } from "@mantine/hooks";
-import { getAllLoanProducts } from "../../../api/productApi";
+import { getLoanProductById } from "../../../api/productApi";
+import { getLoanProducts } from "../../../api/LoanProduct/LoanProductAPi";
 import { getSymbol } from "../../../store/currencyStore";
 import { useCompanyStore } from "../../../store/companyStore";
 
@@ -121,20 +122,33 @@ const customerOptions = useMemo(() => {
     ? customerLabelMap[form.values.customerNumber] || ""
     : "";
 
- const { data: productResponse, isLoading: isProductsLoading, refetch: refetchProducts } = useQuery({
-    queryKey: ["loanProducts"],
-    queryFn: () => getAllLoanProducts({ page_size: 1000 }),
+  const [productSearchInput, setProductSearchInput] = useState("");
+  const [debouncedProductSearch] = useDebouncedValue(productSearchInput, 400);
+
+  // Same search as the Loan Product table (get_loan_products?search=..&page=1&page_size=10).
+  const { data: productResponse, isLoading: isProductsLoading, refetch: refetchProducts } = useQuery({
+    queryKey: ["loanProducts", "search", debouncedProductSearch],
+    queryFn: () =>
+      getLoanProducts({
+        search: debouncedProductSearch.trim() || undefined,
+        page: 1,
+        page_size: 10,
+      }),
+    placeholderData: (previousData) => previousData,
+  });
+
+  const { data: selectedProductResponse } = useQuery({
+    queryKey: ["loanProducts", "selected", form.values.productCode],
+    queryFn: () => getLoanProductById(form.values.productCode as string),
+    enabled: !!form.values.productCode,
   });
 
   const productList = useMemo(() => {
-    return Array.isArray(productResponse?.data)
-      ? productResponse.data
-      : Array.isArray(productResponse?.message?.data)
-      ? productResponse.message.data
-      : Array.isArray(productResponse)
-      ? productResponse
-      : [];
-  }, [productResponse]);
+    const list: any[] = [...(productResponse?.data ?? [])];
+    const selected = selectedProductResponse?.message?.data;
+    if (selected && !list.some((p) => p.name === selected.name)) list.push(selected);
+    return list;
+  }, [productResponse, selectedProductResponse]);
 
   const productOptions = useMemo(() => {
     const activeProducts = productList.filter((p: any) => p.disabled !== 1);
@@ -151,6 +165,11 @@ const customerOptions = useMemo(() => {
       label: p.name,
     }));
   }, [productList, form.values.productCode]);
+
+  const selectedProduct = selectedProductResponse?.message?.data;
+    const maxLoanAmount = selectedProduct?.maximum_loan_amount;
+  const loanAmountTooHigh =
+  form.values.loanAmount > maxLoanAmount;
 
   useEffect(() => {
     if (!form.values.valueDate) {
@@ -198,16 +217,10 @@ const customerOptions = useMemo(() => {
             error={form.errors.productCode}
             onClick={() => refetchProducts()}
             required
-            filter={({ options, search }) => {
-              const q = search.toLowerCase().trim();
-              if (!q) return options;
-              return options.filter((opt) => {
-                const p = productList.find((item: any) => item.name === opt.value);
-                const codeMatch = opt.label.toLowerCase().includes(q);
-                const nameMatch = (p?.product_name || "").toLowerCase().includes(q);
-                return codeMatch || nameMatch;
-              });
-            }}
+            searchValue={productSearchInput}
+            onSearchChange={setProductSearchInput}
+            // The API already filtered by the search.
+            filter={({ options }) => options}
             renderOption={({ option }) => {
               const p = productList.find((item: any) => item.name === option.value);
               return (
@@ -289,23 +302,6 @@ const customerOptions = useMemo(() => {
               value={toDateObj(form.values.trnDate)}
               onChange={(date) => form.setFieldValue("trnDate", toDateString(date))}
             />
-            {/* <DateInput
-              label="Value Date"
-              withAsterisk
-              valueFormat="DD-MMM-YYYY"
-              placeholder="DD-MMM-YYYY"
-              value={toDateObj(form.values.valueDate)}
-              onChange={(date) => form.setFieldValue("valueDate", toDateString(date))}
-            /> */}
-            {/* <DateInput
-              label="Value Date"
-              withAsterisk
-              valueFormat="DD-MMM-YYYY"
-              placeholder="DD-MMM-YYYY"
-              value={toDateObj(form.values.valueDate)}
-              onChange={(date) => form.setFieldValue("valueDate", toDateString(date))}
-              error={form.errors.valueDate}
-            /> */}
             <DateInput
               label="Value Date"
               withAsterisk
@@ -327,6 +323,7 @@ const customerOptions = useMemo(() => {
               placeholder="0"
               thousandSeparator=","
               {...form.getInputProps("loanAmount")}
+              error={loanAmountTooHigh ? `Loan Amount should not exceed ${currencySymbol}${maxLoanAmount}` : undefined}
               required
             />
           </SimpleGrid>
@@ -358,7 +355,7 @@ const customerOptions = useMemo(() => {
               required
             />
             <NumberInput
-  label="Repayment Amount"
+  label="Installment Amount"
   placeholder="0"
   hideControls
   min={0}
@@ -456,7 +453,7 @@ const customerOptions = useMemo(() => {
       autosize
       leftSection={<IconNotes size={14} style={{ color: "var(--mantine-color-slate-4)" }} />}
       leftSectionProps={{ style: { alignItems: 'flex-start', paddingTop: '10px' } }}
-      style={{ gridColumn: 'span 2' }}
+      style={{ gridColumn: 'span 2', alignSelf: 'start' }}
       {...form.getInputProps("_comments")}
     />
   </SimpleGrid>

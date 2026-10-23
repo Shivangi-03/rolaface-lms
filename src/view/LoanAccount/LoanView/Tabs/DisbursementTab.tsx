@@ -1,5 +1,6 @@
 import { Paper, Table, Text, Badge, Pagination, Group } from "@mantine/core";
 import { themeTokens, serif } from "../SharedUI";
+import { formatDisplayDate } from "../../../../utils/formatDate";
 
 export function DisbursementTab({ data, meta, page, setPage, onPaginate, renderCurrency }: any) {
   return (
@@ -65,7 +66,7 @@ export function DisbursementTab({ data, meta, page, setPage, onPaginate, renderC
                 </Table.Td>
 
                 <Table.Td>
-                  <Text fz="sm">{t.disbursement_date}</Text>
+                  <Text fz="sm">{formatDisplayDate(t.disbursement_date)}</Text>
                 </Table.Td>
 
                 <Table.Td>

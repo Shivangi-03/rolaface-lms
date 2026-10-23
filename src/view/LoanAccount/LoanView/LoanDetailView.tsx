@@ -4,6 +4,7 @@ import {
   IconActivity,
   IconBell,
   IconCalculator,
+  IconCalendarEvent,
   IconCalendarStats,
   IconCash,
   IconChevronDown,
@@ -12,6 +13,7 @@ import {
   IconHistory,
   IconLayoutDashboard,
   IconPercentage,
+  IconReceipt,
   IconRefreshDot,
   IconShieldCheck,
   IconWallet,
@@ -36,6 +38,7 @@ import {
 // Tabs
 import { OverviewTab } from "./Tabs/OverviewTab";
 import { DisbursementTab } from "./Tabs/DisbursementTab";
+import { ChargesTab } from "./Tabs/ChargesTab";
 import { ScheduleTab } from "./Tabs/ScheduleTab";
 import { HistoryTab } from "./Tabs/HistoryTab";
 import { AccountingTab } from "./Tabs/AccountingTab";
@@ -43,6 +46,7 @@ import { CollateralTab } from "./Tabs/CollateralTab";
 import { DocumentsTab } from "./Tabs/DocumentsTab";
 import { ActivityTab } from "./Tabs/ActivityTab";
 import { loanRepaymentModal } from "../../../components/Modal/loanRepaymentModalStore";
+import { formatDisplayDate } from "../../../utils/formatDate";
 
 
 interface Borrower {
@@ -106,6 +110,13 @@ export function LoanDetailView({
       />
     );
 
+
+  // Latest payment date of the schedule (used when the loan has no maturity date).
+  const lastScheduleDate: string | undefined = (data.schedule?.repayment_schedule ?? [])
+    .map((row: any) => row.payment_date)
+    .filter(Boolean)
+    .sort()
+    .at(-1);
 
   if (status.overview && !overview) {
     return <LoanDetailSkeleton />;
@@ -228,7 +239,7 @@ export function LoanDetailView({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 pb-3 border-b border-[var(--mantine-color-slate-1)]">
+          <div className="grid grid-cols-2 md:grid-cols-6 gap-4 pb-3 border-b border-[var(--mantine-color-slate-1)]">
             <OverviewField
               icon={<IconWallet size={13} />}
               label="TOTAL OUTSTANDING"
@@ -250,9 +261,14 @@ export function LoanDetailView({
               value={`${overview.rate_of_interest}%`}
             />
             <OverviewField
+              icon={<IconCalendarEvent size={13} />}
+              label="VALUE DATE"
+              value={formatDisplayDate(data.loanDetails?.posting_date) || "—"}
+            />
+            <OverviewField
               icon={<IconCalendarStats size={13} />}
               label="MATURITY DATE"
-              value={overview.maturity_date || "—"}
+              value={formatDisplayDate(overview.maturity_date || lastScheduleDate) || "—"}
             />
           </div>
 
@@ -287,6 +303,9 @@ export function LoanDetailView({
             </Tabs.Tab>
             <Tabs.Tab value="disbursement" leftSection={<IconCash size={14} />}>
               Disbursement
+            </Tabs.Tab>
+            <Tabs.Tab value="charges" leftSection={<IconReceipt size={14} />}>
+              Charges
             </Tabs.Tab>
             <Tabs.Tab
               value="schedule"
@@ -335,6 +354,13 @@ export function LoanDetailView({
               page={pagination.disbursementPage}
               setPage={pagination.setDisbursementPage}
               onPaginate={actions.fetchDisbursements}
+              renderCurrency={renderCurrency}
+            />
+          </Tabs.Panel>
+          <Tabs.Panel value="charges">
+            <ChargesTab
+              data={data.loanDetails}
+              loading={status.loanDetails}
               renderCurrency={renderCurrency}
             />
           </Tabs.Panel>
