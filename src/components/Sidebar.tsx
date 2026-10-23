@@ -3,12 +3,9 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import {
   IconCalendarClock,
   IconMail,
-  IconSettingsCheck,
-  IconTimelineEvent,
   IconUserCog,
   IconLayersLinked,
   IconSignature,
-  IconClipboardText,
   IconBriefcase,
   IconBuildingStore,
   IconHierarchy,
@@ -47,18 +44,16 @@ import {
   IconTool,
   IconChevronDown,
   IconBuildingBank,
-  IconListDetails,
   IconReportAnalytics,
   IconCreditCard,
   IconFileInvoice,
   IconHome, IconHierarchy2,
   IconReceipt2,
   IconScale,
-  IconChartBar,
   IconArrowsExchange,
   IconReceipt,
   IconBox,
-  IconCoins, IconBrandProducthunt,
+  IconCoins,
   IconCreditCardRefund,
   IconCreditCardPay,
   IconChartLine,
@@ -66,7 +61,6 @@ import {
   IconCircleDot,
   // IconHourglass, (Renewal item hidden)
   IconCategory,
-  IconMinus,
   IconListNumbers,
 } from "@tabler/icons-react";
 import type { PermissionAction } from "../store/Permissionstore";
@@ -77,7 +71,7 @@ import { openCommonModal } from "./Modal/AlertModal";
 import { parseFrappeError } from "../utils/parseFrappeError";
 import type { LmsModule } from "../types/User/userRole";
 import { ERP_FRONTEND } from '../config/resolveUrls';
-
+import { hasProduct, hasModule } from "../utils/subscription";
 
 
 interface NavItem {
@@ -92,6 +86,7 @@ interface NavItem {
   subItems?: NavItem[];
   modules?: LmsModule[];
   action?: PermissionAction;
+  subscriptionModule?: string;
 }
 
 const LOCAL_NAV_ITEMS: NavItem[] = [
@@ -107,6 +102,7 @@ const LOCAL_NAV_ITEMS: NavItem[] = [
     icon: IconUsers,
     matchPrefix: true,
     modules: ["Customer"],
+    subscriptionModule: "Customer",
   },
   {
     path: "/collateral",
@@ -117,6 +113,7 @@ const LOCAL_NAV_ITEMS: NavItem[] = [
       { path: "/collateral/type", label: "Collateral Type", icon: IconBox, modules: ["Loan Security Type"] },
       { path: "/collateral/list", label: "Collateral", icon: IconCoins, modules: ["Loan Security"] },
     ],
+    subscriptionModule: "Collateral"
   },
   {
     path: "/setup",
@@ -133,6 +130,7 @@ const LOCAL_NAV_ITEMS: NavItem[] = [
       { path: "/setup/map-products", label: "Map Loan Products", icon: IconLayersLinked },
       { path: "/setup/lending-configuration", label: "Lending Configuration", icon: IconSettings },
     ],
+    subscriptionModule: "Lending Setup"
   },
   {
     path: "/origination-setup",
@@ -195,6 +193,7 @@ const LOCAL_NAV_ITEMS: NavItem[] = [
       //   icon: IconBrandProducthunt,
       // }, 
     ],
+    subscriptionModule: "Origination Setup"
   },
   {
     path: "/origination",
@@ -208,6 +207,7 @@ const LOCAL_NAV_ITEMS: NavItem[] = [
       { path: "/origination/underwriting", label: "Underwriting", icon: IconCertificate, modules: ["Loan Application"] },
       { path: "/origination/offerIssuanceStage", label: "Offer Issuance", icon: IconSignature, modules: ["Loan Application"] },
     ],
+    subscriptionModule: "Origination"
   },
   {
     path: "/operations",
@@ -224,6 +224,7 @@ const LOCAL_NAV_ITEMS: NavItem[] = [
       { path: "/operations/writeoff", label: "Loan Write-Off", icon: IconFileOff, modules: ["Loan Write Off"] },
       { path: "/operations/transfer", label: "Loan Transfer", icon: IconArrowsExchange, modules: ["Loan Transfer"] },
     ],
+    subscriptionModule: "Lending Operations"
   },
   {
     path: "/accounting",
@@ -302,6 +303,7 @@ const LOCAL_NAV_ITEMS: NavItem[] = [
         action: "report",
       },
     ],
+    subscriptionModule: "Accounting"
   },
   {
     path: "/reports",
@@ -315,6 +317,7 @@ const LOCAL_NAV_ITEMS: NavItem[] = [
       { path: "/reports/disbursement", label: "Disbursements", icon: IconFileText, modules: ["Loan"] },
       { path: "/reports/portfolio", label: "Loan Portfolio", icon: IconFileText, modules: ["Loan"] },
     ],
+    subscriptionModule: "Lending Reports"
   },
   {
     path: "/investor",
@@ -611,15 +614,20 @@ export function Sidebar({
   const HIDDEN_IN_LENDING_MODE = ["/origination", "/origination-setup"];
   const HIDDEN_IN_LOS_MODE = ["/setup", "/operations", "/reports", "/investor"];
 
-  const navItemsForSubscription = React.useMemo(
-    () =>
-      LOCAL_NAV_ITEMS.filter((item) => {
-        if (entryMode === "lending" && HIDDEN_IN_LENDING_MODE.includes(item.path ?? "")) return false;
-        if (entryMode === "los" && HIDDEN_IN_LOS_MODE.includes(item.path ?? "")) return false;
-        return true;
-      }),
-    [entryMode],
-  );
+const sm = user?.subscribed_modules;
+const activeProduct = entryMode === "los" ? "LOS" : "LMS";
+
+const navItemsForSubscription = React.useMemo(
+  () =>
+    LOCAL_NAV_ITEMS.filter((item) => {
+      if (entryMode === "lending" && HIDDEN_IN_LENDING_MODE.includes(item.path ?? "")) return false;
+      if (entryMode === "los" && HIDDEN_IN_LOS_MODE.includes(item.path ?? "")) return false;
+      if (item.subscriptionModule && !hasModule(sm, activeProduct, item.subscriptionModule)) return false;
+      return true;
+    }),
+  [entryMode, sm, activeProduct],
+);
+
   const visibleNavItems = React.useMemo(
     () => filterNavItems(navItemsForSubscription, can),
     [can, isAdmin, permissions, navItemsForSubscription]
@@ -628,19 +636,10 @@ export function Sidebar({
   const clearUser = useUserStore((s) => s.clearUser);
   const [loggingOut, setLoggingOut] = React.useState(false);
 
-  // Show "Switch workspace" only if the company's plan actually has an
-  // ERP-side workspace enabled (erp OR hrms). If the company is
-  // lending-only, there's nowhere else to switch to.
-  const canSwitchWorkspace =
-    user?.subscribed_modules?.erp?.enabled === true ||
-    user?.subscribed_modules?.hrms?.enabled === true;
+const canSwitchWorkspace = hasProduct(sm, "ERP") || hasProduct(sm, "HRMS");
 
-  // No ERP/HRMS access, but both LMS sub-modules subscribed → house button
-  // repurposes into a Lending ⇄ Loan Origination switch instead of hiding.
-  const canSwitchLmsMode =
-    !canSwitchWorkspace &&
-    user?.subscribed_modules?.lending?.enabled === true &&
-    user?.subscribed_modules?.los?.enabled === true;
+const canSwitchLmsMode =
+  !canSwitchWorkspace && hasProduct(sm, "LMS") && hasProduct(sm, "LOS");
 
 
   const displayName =
