@@ -8,6 +8,7 @@ export interface LoginUser {
   lastName: string;
   roles?: string[];
   subscribed_modules?: RawSubscribedModules;
+  subscription_expired?: boolean;
   [key: string]: any;
 }
 

@@ -4,6 +4,7 @@ import { useMediaQuery } from '@mantine/hooks';
 import { Sidebar } from '../components/Sidebar';
 import { ModalHost } from '../store/modal store/ModalHost';
 import { MinimizedChipStack } from '../components/shared/MinimizedChipStack';
+import { SubscriptionExpiredBanner } from '../view/Subscription/SubscriptionExpiredBanner';
 import '../store/modal store/registerModals';
 
 export function AppLayout({ children }: { children: ReactNode }) {
@@ -34,6 +35,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
       </AppShell.Navbar>
 
       <AppShell.Main className="h-screen bg-[#F8F9FB]">
+        <SubscriptionExpiredBanner />
         {children}
         <ModalHost />
       </AppShell.Main>

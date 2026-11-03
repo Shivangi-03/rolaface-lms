@@ -28,6 +28,7 @@ import {
   getMySubscription,
   type MySubscriptionResponse,
 } from "../../api/subscriptionApi";
+import { useUserStore } from "../../store/userStore";
 
 const parseDate = (d: string) => new Date(`${d.slice(0, 10)}T00:00:00`);
 
@@ -110,6 +111,12 @@ export function MySubscription() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const mounted = useRef(true);
+  const isFlagExpired = useUserStore((s) => s.user?.subscription_expired === true);
+  const rawStatus = data?.subscription_status?.trim() || null;
+  const subscriptionStatus =
+    isFlagExpired && (rawStatus === "Active" || rawStatus === "Trialing")
+      ? "Expired"
+      : rawStatus;
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -166,7 +173,6 @@ export function MySubscription() {
 
   const renewalDate = d?.end_date ?? null;
   const daysToRenewal = renewalDate ? daysFromToday(renewalDate) : null;
-  const subscriptionStatus = data?.subscription_status?.trim() || null;
 
   return (
     <Stack gap="lg" p="md">
